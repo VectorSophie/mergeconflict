@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String             @id @default(cuid())
+  name             String?
+  email            String?            @unique
+  emailVerified    DateTime?
+  image            String?
+  githubLogin      String?
+  accounts         Account[]
+  sessions         Session[]
+  developerProfile DeveloperProfile?
+  swipes           Swipe[]
+  matches          Match[]
+  chatThreads      ChatThread[]
+  usageCounters    UsageCounter[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model DeveloperProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  archetype           String
+  summary             String   @db.Text
+  strengths           String[]
+  risks               String[]
+  preferredLanguages  String[]
+  preferredStacks     String[]
+  architectureTendency String  @db.Text
+  collaborationStyle  String   @db.Text
+  compatibilityStyle  String   @db.Text
+  representativeRepos Json
+  githubSignals       Json
+  generatedByModel    String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RepositoryProfile {
+  id                         String       @id @default(cuid())
+  githubId                   Int?         @unique
+  owner                      String
+  name                       String
+  fullName                   String       @unique
+  description                String?      @db.Text
+  avatarUrl                  String?
+  ownerAvatarUrl             String?
+  bannerUrl                  String?
+  githubUrl                  String
+  issuesUrl                  String
+  primaryLanguage            String?
+  languageColor              String?
+  stars                      Int          @default(0)
+  forks                      Int          @default(0)
+  openIssues                 Int          @default(0)
+  contributors               Int          @default(0)
+  goodFirstIssues            Int          @default(0)
+  lastUpdated                DateTime?
+  license                    String?
+  topics                     String[]
+  techStack                  String[]
+  compatibility              Int          @default(50)
+  onboardingDifficulty       Difficulty   @default(Medium)
+  activityLevel              Activity     @default(Medium)
+  documentationQuality       DocumentationQuality @default(Okay)
+  maintainerVibe             String       @default("")
+  contributorCulture         String       @default("")
+  personalityLine            String       @db.Text
+  aiPersonaTagline           String       @db.Text
+  readmeSummary              String       @db.Text
+  greenFlags                 String[]
+  redFlags                   String[]
+  suggestedFirstContribution String       @db.Text
+  whyYouMatch                String       @db.Text
+  repoLoveLanguage           String       @db.Text
+  rawGithub                  Json?
+  generatedByModel           String?
+  swipes                     Swipe[]
+  matches                    Match[]
+  chatThreads                ChatThread[]
+  cacheEntries               RepoCache[]
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+}
+
+model Swipe {
+  id           String            @id @default(cuid())
+  userId       String
+  repositoryId String
+  direction    SwipeDirection
+  result       SwipeResult
+  createdAt    DateTime          @default(now())
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   RepositoryProfile @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Match {
+  id           String            @id @default(cuid())
+  userId       String
+  repositoryId String
+  reason       MatchReason
+  createdAt    DateTime          @default(now())
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   RepositoryProfile @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repositoryId])
+}
+
+model ChatThread {
+  id           String            @id @default(cuid())
+  userId       String
+  repositoryId String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   RepositoryProfile @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+
+  @@unique([userId, repositoryId])
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  threadId  String
+  role      ChatRole
+  content   String     @db.Text
+  model     String?
+  createdAt DateTime   @default(now())
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+}
+
+model UsageCounter {
+  id        String   @id @default(cuid())
+  userId    String
+  key       String
+  period    String
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key, period])
+}
+
+model RepoCache {
+  id           String            @id @default(cuid())
+  repositoryId String
+  key          String
+  value        Json
+  expiresAt    DateTime
+  createdAt    DateTime          @default(now())
+  repository   RepositoryProfile @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, key])
+}
+
+enum SwipeDirection {
+  left
+  right
+  up
+}
+
+enum SwipeResult {
+  skip
+  interested
+  match
+}
+
+enum MatchReason {
+  compatibility
+  super_like
+}
+
+enum ChatRole {
+  user
+  repo
+  system
+}
+
+enum Difficulty {
+  Easy
+  Medium
+  Hard
+  Haunted
+}
+
+enum Activity {
+  Low
+  Medium
+  High
+  Chaotic
+}
+
+enum DocumentationQuality {
+  Sparse
+  Okay
+  Good
+  Excellent
+  SuspiciouslyPerfect
+}
