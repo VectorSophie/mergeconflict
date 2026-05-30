@@ -1,0 +1,17 @@
+export const seedRepositories = [
+  "open-webui/open-webui",
+  "vercel/ai",
+  "langchain-ai/langchain",
+  "twentyhq/twenty",
+  "excalidraw/excalidraw",
+  "supabase/supabase",
+  "immich-app/immich",
+  "zed-industries/zed",
+  "shadcn-ui/ui",
+  "storybookjs/storybook",
+  "ollama/ollama",
+  "rust-lang/rustlings",
+  "withastro/astro",
+  "nuejs/nue",
+  "penpot/penpot",
+];
