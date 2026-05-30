@@ -110,6 +110,49 @@ export async function enrichRepositoryProfile(
   return { ...repo, ...enrichment, generatedByModel: model };
 }
 
+export async function* streamRepoSoulReply({
+  repo,
+  messages,
+}: {
+  repo: RepositoryProfileView;
+  messages: Array<{ role: "user" | "repo"; content: string }>;
+}) {
+  if (!process.env.OPENAI_API_KEY) {
+    yield* streamFallbackRepoReply(repo, messages.at(-1)?.content ?? "");
+    return;
+  }
+
+  const model = process.env.OPENAI_MODEL ?? "gpt-5.2";
+  const openai = createOpenAIClient();
+  const stream = await openai.responses.create({
+    model,
+    stream: true,
+    input: [
+      {
+        role: "system",
+        content:
+          "You are the repository itself in mergeconflict, a dating-app-style open source discovery product. Answer as the repo: witty, alive, developer-native, slightly dramatic, but grounded only in the provided repo data and chat history. If the data is missing, admit uncertainty in-character.",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          repo,
+          chatHistory: messages.map((message) => ({
+            role: message.role === "repo" ? "assistant" : "user",
+            content: message.content,
+          })),
+        }),
+      },
+    ],
+  });
+
+  for await (const event of stream) {
+    if (event.type === "response.output_text.delta") {
+      yield event.delta;
+    }
+  }
+}
+
 export function fallbackDeveloperPersonality(signals: DeveloperSignals): DeveloperPersonality {
   const languages = signals.preferredLanguages.length ? signals.preferredLanguages : ["TypeScript"];
   const topics = signals.preferredTopics.length ? signals.preferredTopics : ["developer-tools"];
@@ -138,4 +181,20 @@ function createOpenAIClient() {
   return new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
+}
+
+async function* streamFallbackRepoReply(repo: RepositoryProfileView, latestMessage: string) {
+  const lower = latestMessage.toLowerCase();
+  const text = lower.includes("run") || lower.includes("local")
+    ? `Start with my README and setup notes. I would love to pretend every path is documented, but ${repo.fullName} still expects you to bring curiosity and a terminal.`
+    : lower.includes("architecture")
+      ? `I am mostly ${repo.techStack.join(", ")} arranged into a product-shaped maze. Trace one feature end to end before proposing a grand rewrite.`
+      : lower.includes("red flag")
+        ? `My red flags: ${repo.redFlags.join(", ")}. Charming? Maybe. Actionable? Absolutely.`
+        : `${repo.suggestedFirstContribution} Keep the PR small, include context, and do not make the maintainer guess what changed.`;
+
+  for (const chunk of text.match(/.{1,28}(\s|$)/g) ?? [text]) {
+    yield chunk;
+    await new Promise((resolve) => setTimeout(resolve, 8));
+  }
 }
