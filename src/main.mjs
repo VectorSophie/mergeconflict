@@ -18,8 +18,12 @@ const state = {
 const app = document.querySelector('#app');
 
 function setState(patch) {
+  const previousScreen = state.screen;
   Object.assign(state, patch);
   render();
+  if (patch.screen && patch.screen !== previousScreen) {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
 }
 
 function template(strings, ...values) {
